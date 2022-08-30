@@ -20,8 +20,8 @@ return [
 		['name' => 'wireAPI#sendFile', 'url' => '/sendFile', 'verb' => 'POST'],
 		['name' => 'wireAPI#getConversations', 'url' => '/conversations', 'verb' => 'GET'],
 		['name' => 'wireAPI#getWireUrl', 'url' => '/url', 'verb' => 'GET'],
-		['name' => 'wireAPI#getUserAvatar', 'url' => '/users/{userId}/image', 'verb' => 'GET'],
-		['name' => 'wireAPI#getTeamAvatar', 'url' => '/teams/{teamId}/image', 'verb' => 'GET'],
+		['name' => 'wireAPI#getUserAvatar', 'url' => '/users/{domain}/{userId}/image', 'verb' => 'GET'],
+		['name' => 'wireAPI#getTeamAvatar', 'url' => '/teams/{domain}/{teamId}/image', 'verb' => 'GET'],
 
 		['name' => 'files#getFileImage', 'url' => '/preview', 'verb' => 'GET'],
 	]

@@ -25,6 +25,7 @@ use OCP\Files\NotPermittedException;
 use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IURLGenerator;
+use OCP\PreConditionNotMetException;
 use OCP\Share\IShare;
 use Psr\Log\LoggerInterface;
 use OCP\Http\Client\IClientService;
@@ -83,38 +84,51 @@ class WireAPIService {
 
 	/**
 	 * @param string $userId
+	 * @param string $domain
 	 * @param string $wireUserId
 	 * @return array
-	 * @throws Exception
+	 * @throws PreConditionNotMetException
 	 */
-	public function getUserAvatar(string $userId, string $wireUserId): array {
-		$image = $this->request($userId, 'users/' . $wireUserId . '/image', [], 'GET', false);
-		if (!is_array($image)) {
-			return ['avatarContent' => $image];
+	public function getUserAvatar(string $userId, string $domain, string $wireUserId): array {
+		error_log('1111');
+		$userInfo = $this->request($userId, 'users/' . $domain . '/' . $wireUserId);
+		if (isset($userInfo['error'])) {
+			return $userInfo;
 		}
-		$image = $this->request($userId, 'users/' . $wireUserId . '/image/default', [], 'GET', false);
-		if (!is_array($image)) {
-			return ['avatarContent' => $image];
+		$asset = null;
+		foreach ($userInfo['assets'] as $a) {
+			if ($a['type'] === 'image' && $a['size'] === 'complete') {
+				$asset = $a;
+				break;
+			}
 		}
-
-		$userInfo = $this->request($userId, 'users/' . $wireUserId);
+		if ($asset === null) {
+			return ['userInfo' => $userInfo];
+		}
+		error_log('IMAGE : ' . 'assets/' . $domain . '/' . $asset['key']);
+		$image = $this->request($userId, 'assets/' . $domain . '/' . $asset['key'], [], 'GET', false);
+		if (isset($image['body'])) {
+			return ['avatarContent' => $image['body']];
+		}
+		error_log('ERROR '. json_encode($image));
 		return ['userInfo' => $userInfo];
 	}
 
 	/**
 	 * @param string $userId
+	 * @param string $domain
 	 * @param string $teamId
 	 * @return array
-	 * @throws Exception
+	 * @throws PreConditionNotMetException
 	 */
-	public function getTeamAvatar(string $userId, string $teamId): array {
-		$image = $this->request($userId, 'teams/' . $teamId . '/image', [], 'GET', false);
-		if (!is_array($image)) {
-			return ['avatarContent' => $image];
+	public function getTeamAvatar(string $userId, string $domain, string $teamId): array {
+		$image = $this->request($userId, 'assets/' . $domain . '/' . $teamId, [], 'GET', false);
+		if (isset($image['body'])) {
+			return ['avatarContent' => $image['body']];
 		}
 
-		$userInfo = $this->request($userId, 'teams/' . $teamId);
-		return ['teamInfo' => $userInfo];
+		$teamInfo = $this->request($userId, 'teams/' . $teamId);
+		return ['teamInfo' => $teamInfo];
 	}
 
 	/**
@@ -202,13 +216,30 @@ class WireAPIService {
 	 * @throws Exception
 	 */
 	public function getMyConversationsPerId(string $userId): array {
-		$result = $this->request($userId, 'channels');
+		$result = $this->request($userId, 'conversations');
 		if (isset($result['error'])) {
 			return $result;
 		}
 		$perId = [];
-		foreach ($result as $channel) {
-			$perId[$channel['id']] = $channel;
+		foreach ($result['conversations'] as $conversation) {
+			$perId[$conversation['id']] = $conversation;
+		}
+		return $perId;
+	}
+
+	/**
+	 * @param string $userId
+	 * @return array|string[]
+	 * @throws Exception
+	 */
+	public function getMyTeamsPerId(string $userId): array {
+		$result = $this->request($userId, 'teams');
+		if (isset($result['error'])) {
+			return $result;
+		}
+		$perId = [];
+		foreach ($result['teams'] as $teams) {
+			$perId[$teams['id']] = $teams;
 		}
 		return $perId;
 	}
@@ -219,11 +250,35 @@ class WireAPIService {
 	 * @throws Exception
 	 */
 	public function getMyConversations(string $userId): array {
-		$result = $this->request($userId, 'channels');
+		$result = $this->request($userId, 'conversations');
 		if (isset($result['error'])) {
 			return $result;
 		}
-		return $result;
+		$teamsPerId = $this->getMyTeamsPerId($userId);
+		if (isset($teamsPerId['error'])) {
+			return $result;
+		}
+		$conversations = [];
+		foreach ($result['conversations'] as $conversation) {
+			if ($conversation['team'] !== null) {
+				$conversation['team_name'] = $teamsPerId[$conversation['team']]['name'] ?? '??';
+				if ($conversation['name'] === null
+					&& isset($conversation['members'], $conversation['members']['others'])
+					&& is_array($conversation['members']['others'])
+					&& count($conversation['members']['others']) === 1
+				) {
+					$member = $conversation['members']['others'][0];
+					$domain = $member['qualified_id']['domain'];
+					$wireUserId = $member['qualified_id']['id'];
+					$userInfo = $this->request($userId, 'users/' . $domain . '/' . $wireUserId);
+					if (!isset($userInfo['error']) && isset($userInfo['name'])) {
+						$conversation['name'] = $userInfo['name'];
+					}
+				}
+				$conversations[] = $conversation;
+			}
+		}
+		return $conversations;
 	}
 
 	/**
@@ -396,11 +451,12 @@ class WireAPIService {
 	 * @param array $params
 	 * @param string $method
 	 * @param bool $jsonResponse
+	 * @param bool $useCookie
 	 * @return array|mixed|resource|string|string[]
-	 * @throws Exception
+	 * @throws PreConditionNotMetException
 	 */
 	public function request(string $userId, string $endPoint, array $params = [], string $method = 'GET',
-							bool $jsonResponse = true) {
+							bool $jsonResponse = true, bool $useCookie = false): array {
 		$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url') ?: Application::DEFAULT_WIRE_API_URL;
 		$url = $this->config->getUserValue($userId, Application::APP_ID, 'url', $adminUrl) ?: $adminUrl;
 
@@ -416,6 +472,11 @@ class WireAPIService {
 					'User-Agent'  => Application::INTEGRATION_USER_AGENT,
 				],
 			];
+
+			if ($useCookie) {
+				$cookie = $this->config->getUserValue($userId, Application::APP_ID, 'cookie');
+				$options['headers']['Cookie'] = 'zuid=' . $cookie;
+			}
 
 			if (count($params) > 0) {
 				if ($method === 'GET') {
@@ -457,7 +518,10 @@ class WireAPIService {
 				if ($jsonResponse) {
 					return json_decode($body, true);
 				} else {
-					return $body;
+					return [
+						'body' => $body,
+						'headers' => $response->getHeaders(),
+					];
 				}
 			}
 		} catch (ServerException | ClientException $e) {
@@ -504,8 +568,9 @@ class WireAPIService {
 			$accessToken = $result['access_token'];
 			$this->config->setUserValue($userId, Application::APP_ID, 'token', $accessToken);
 			// we may get a new cookie
-			if (isset($result['cookie'])) {
+			if (isset($result['cookie'], $result['full-cookie'])) {
 				$this->config->setUserValue($userId, Application::APP_ID, 'cookie', $result['cookie']);
+				$this->config->setUserValue($userId, Application::APP_ID, 'full-cookie', $result['full-cookie']);
 			}
 			$nowTs = (new Datetime())->getTimestamp();
 			$expiresAt = $nowTs + (int) $result['expires_in'];
@@ -548,7 +613,10 @@ class WireAPIService {
 				$result = json_decode($body, true);
 				$setCookieHeader = $response->getHeader('Set-Cookie');
 				if ($setCookieHeader) {
-					$result['cookie'] = $setCookieHeader;
+					$cookie = preg_replace('/^zuid=/', '', $setCookieHeader);
+					$cookie = preg_replace('/; Path=.*$/', '', $cookie);
+					$result['cookie'] = $cookie;
+					$result['full-cookie'] = $setCookieHeader;
 				}
 				return $result;
 			}
@@ -559,14 +627,16 @@ class WireAPIService {
 	}
 
 	/**
-	 * @param string $baseUrl
+	 * @param string $userId
 	 * @param string $login
 	 * @param string $password
 	 * @return array
 	 */
-	public function login(string $baseUrl, string $login, string $password): array {
+	public function login(string $userId, string $login, string $password): array {
+		$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url') ?: Application::DEFAULT_WIRE_API_URL;
+		$url = $this->config->getUserValue($userId, Application::APP_ID, 'url', $adminUrl) ?: $adminUrl;
 		try {
-			$url = $baseUrl . '/login?persist=true';
+			$url = $url . '/login?persist=true';
 			$options = [
 				'headers' => [
 					'User-Agent'  => Application::INTEGRATION_USER_AGENT,
@@ -590,7 +660,10 @@ class WireAPIService {
 				if (!$setCookieHeader) {
 					return ['error' => $this->l10n->t('Invalid response')];
 				}
-				$result['cookie'] = $setCookieHeader;
+				$cookie = preg_replace('/^zuid=/', '', $setCookieHeader);
+				$cookie = preg_replace('/; Path=.*$/', '', $cookie);
+				$result['cookie'] = $cookie;
+				$result['full-cookie'] = $setCookieHeader;
 				return $result;
 			}
 		} catch (Exception $e) {

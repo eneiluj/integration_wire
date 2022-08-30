@@ -14,27 +14,26 @@ import moment from '@nextcloud/moment'
 import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import { translate as t, translatePlural as n } from '@nextcloud/l10n'
-import { oauthConnect, oauthConnectConfirmDialog } from './utils.js'
 
 import Vue from 'vue'
 import './bootstrap.js'
 
 const DEBUG = false
 
-function openChannelSelector(files) {
-	OCA.Mattermost.filesToSend = files
-	const modalVue = OCA.Mattermost.MattermostSendModalVue
-	modalVue.updateChannels()
+function openConversationSelector(files) {
+	OCA.Wire.filesToSend = files
+	const modalVue = OCA.Wire.WireSendModalVue
+	modalVue.updateConversations()
 	modalVue.setFiles([...files])
 	modalVue.showModal()
 }
 
 (function() {
-	if (!OCA.Mattermost) {
+	if (!OCA.Wire) {
 		/**
 		 * @namespace
 		 */
-		OCA.Mattermost = {
+		OCA.Wire = {
 			filesToSend: [],
 		}
 	}
@@ -42,33 +41,29 @@ function openChannelSelector(files) {
 	/**
 	 * @namespace
 	 */
-	OCA.Mattermost.FilesPlugin = {
+	OCA.Wire.FilesPlugin = {
 		ignoreLists: [
 			'trashbin',
 			'files.public',
 		],
 
 		attach(fileList) {
-			if (DEBUG) console.debug('[Mattermost] begin of attach')
+			if (DEBUG) console.debug('[Wire] begin of attach')
 			if (this.ignoreLists.indexOf(fileList.id) >= 0) {
 				return
 			}
 
-			if (DEBUG) console.debug('[Mattermost] before sendFileIdsAfterOAuth')
-			this.sendFileIdsAfterOAuth(fileList)
-
 			fileList.registerMultiSelectFileAction({
-				name: 'mattermostSendMulti',
+				name: 'WireSendMulti',
 				displayName: (context) => {
-					if (DEBUG) console.debug('[Mattermost] in registerMultiSelectFileAction->displayName: OCA.Mattermost.oauthPossible', OCA.Mattermost.oauthPossible)
-					if (OCA.Mattermost.mattermostConnected || OCA.Mattermost.oauthPossible) {
-						return t('integration_mattermost', 'Send files to Mattermost')
+					if (OCA.Wire.wireConnected) {
+						return t('integration_wire', 'Send files to Wire')
 					}
 					return ''
 				},
 				iconClass: () => {
-					if (OCA.Mattermost.mattermostConnected || OCA.Mattermost.oauthPossible) {
-						return 'icon-mattermost'
+					if (OCA.Wire.wireConnected) {
+						return 'icon-wire'
 					}
 				},
 				order: -2,
@@ -81,44 +76,27 @@ function openChannelSelector(files) {
 							size: f.size,
 						}
 					})
-					if (OCA.Mattermost.mattermostConnected) {
-						openChannelSelector(filesToSend)
-					} else if (OCA.Mattermost.oauthPossible) {
-						this.connectToMattermost(filesToSend)
+					if (OCA.Wire.wireConnected) {
+						openConversationSelector(filesToSend)
+					} else {
+						this.connectToWire(filesToSend)
 					}
 				},
 			})
 
-			/*
-			// when the multiselect menu is opened =>
-			// only show 'send to mattermost' if at least one selected item is a file
-			fileList.$el.find('.actions-selected').click(() => {
-				if (OCA.Mattermost.mattermostConnected) {
-					let showSendMultiple = false
-					for (const fid in fileList._selectedFiles) {
-						const file = fileList.files.find((t) => parseInt(fid) === t.id)
-						if (file.type !== 'dir') {
-							showSendMultiple = true
-						}
-					}
-					fileList.fileMultiSelectMenu.toggleItemVisibility('mattermostSendMulti', showSendMultiple)
-				}
-			})
-			*/
-
 			fileList.fileActions.registerAction({
-				name: 'mattermostSendSingle',
+				name: 'wireSendSingle',
 				displayName: (context) => {
-					if (OCA.Mattermost.mattermostConnected || OCA.Mattermost.oauthPossible) {
-						return t('integration_mattermost', 'Send to Mattermost')
+					if (OCA.Wire.wireConnected) {
+						return t('integration_wire', 'Send to Wire')
 					}
 					return ''
 				},
 				mime: 'all',
 				order: -139,
 				iconClass: (fileName, context) => {
-					if (OCA.Mattermost.mattermostConnected || OCA.Mattermost.oauthPossible) {
-						return 'icon-mattermost'
+					if (OCA.Wire.wireConnected) {
+						return 'icon-wire'
 					}
 				},
 				permissions: OC.PERMISSION_READ,
@@ -131,229 +109,170 @@ function openChannelSelector(files) {
 							size: context.fileInfoModel.attributes.size,
 						},
 					]
-					if (OCA.Mattermost.mattermostConnected) {
-						openChannelSelector(filesToSend)
-					} else if (OCA.Mattermost.oauthPossible) {
-						this.connectToMattermost(filesToSend)
+					if (OCA.Wire.wireConnected) {
+						openConversationSelector(filesToSend)
+					} else {
+						this.connectToWire(filesToSend)
 					}
 				},
 			})
 		},
 
-		/**
-		 * In case we successfully connected with oauth and got redirected back to files
-		 * actually go on with the files that were previously selected
-		 *
-		 * @param {object} fileList the one from attach()
-		 */
-		sendFileIdsAfterOAuth: (fileList) => {
-			const fileIdsStr = OCA.Mattermost.fileIdsToSendAfterOAuth
-			if (DEBUG) console.debug('[Mattermost] in sendFileIdsAfterOAuth, fileIdsStr', fileIdsStr)
-			// this is only true after an OAuth connection initated from a file action
-			if (fileIdsStr) {
-				const currentDir = OCA.Mattermost.currentDirAfterOAuth
-				// trick to make sure the file list is loaded (didn't find an event or a good alternative)
-				// force=true to make sure we get a promise
-				fileList.changeDirectory(currentDir, true, true).then(() => {
-					const fileIds = fileIdsStr.split(',')
-					const files = fileIds.map((fid) => {
-						const f = fileList.files.find((e) => e.id === parseInt(fid))
-						if (f) {
-							return {
-								id: f.id,
-								name: f.name,
-								type: f.type,
-								size: f.size,
-							}
-						}
-						return null
-					}).filter((e) => e !== null)
-					if (DEBUG) console.debug('[Mattermost] in sendFileIdsAfterOAuth, after changeDirectory, files:', files)
-					if (files.length) {
-						if (DEBUG) console.debug('[Mattermost] in sendFileIdsAfterOAuth, after changeDirectory, call openChannelSelector')
-						openChannelSelector(files)
-					}
-				})
-			}
-		},
-
-		connectToMattermost: (selectedFiles = []) => {
-			oauthConnectConfirmDialog(OCA.Mattermost.mattermostUrl).then((result) => {
-				if (result) {
-					if (OCA.Mattermost.usePopup) {
-						oauthConnect(OCA.Mattermost.mattermostUrl, OCA.Mattermost.clientId, null, true)
-							.then((data) => {
-								OCA.Mattermost.mattermostConnected = true
-								openChannelSelector(selectedFiles)
-							})
-					} else {
-						const selectedFilesIds = selectedFiles.map(f => f.id)
-						oauthConnect(
-							OCA.Mattermost.mattermostUrl,
-							OCA.Mattermost.clientId,
-							'files--' + OCA.Files.App.fileList._currentDirectory + '--' + selectedFilesIds.join(',')
-						)
-					}
-				}
-			})
+		connectToWire: (selectedFiles = []) => {
+			console.debug('[WIRE] connect')
 		},
 	}
 
 })()
 
-function sendLinks(channelId, channelName, comment, permission, expirationDate, password) {
+function sendLinks(conversationId, conversationName, comment, permission, expirationDate, password) {
 	const req = {
-		fileIds: OCA.Mattermost.filesToSend.map((f) => f.id),
-		channelId,
-		channelName,
+		fileIds: OCA.Wire.filesToSend.map((f) => f.id),
+		conversationId,
+		conversationName,
 		comment,
 		permission,
 		expirationDate: expirationDate ? moment(expirationDate).format('YYYY-MM-DD') : undefined,
 		password,
 	}
-	const url = generateUrl('apps/integration_mattermost/sendLinks')
+	const url = generateUrl('apps/integration_wire/sendLinks')
 	axios.post(url, req).then((response) => {
-		const number = OCA.Mattermost.filesToSend.length
+		const number = OCA.Wire.filesToSend.length
 		showSuccess(
 			n(
-				'integration_mattermost',
-				'A link to {fileName} was sent to {channelName}',
-				'{number} links were sent to {channelName}',
+				'integration_wire',
+				'A link to {fileName} was sent to {conversationName}',
+				'{number} links were sent to {conversationName}',
 				number,
 				{
-					fileName: OCA.Mattermost.filesToSend[0].name,
-					channelName,
+					fileName: OCA.Wire.filesToSend[0].name,
+					conversationName,
 					number,
 				}
 			)
 		)
-		OCA.Mattermost.MattermostSendModalVue.success()
+		OCA.Wire.WireSendModalVue.success()
 	}).catch((error) => {
 		console.error(error)
-		OCA.Mattermost.MattermostSendModalVue.failure()
-		OCA.Mattermost.filesToSend = []
+		OCA.Wire.WireSendModalVue.failure()
+		OCA.Wire.filesToSend = []
 		showError(
-			t('integration_mattermost', 'Failed to send links to Mattermost')
+			t('integration_wire', 'Failed to send links to Wire')
 			+ ' ' + error.response?.request?.responseText
 		)
 	})
 }
 
-function sendFileLoop(channelId, channelName, count = 0) {
-	if (OCA.Mattermost.filesToSend.length === 0) {
+function sendFileLoop(conversationId, conversationName, count = 0) {
+	if (OCA.Wire.filesToSend.length === 0) {
 		showSuccess(
 			n(
-				'integration_mattermost',
-				'{count} file was sent to {channelName}',
-				'{count} files were sent to {channelName}',
+				'integration_wire',
+				'{count} file was sent to {conversationName}',
+				'{count} files were sent to {conversationName}',
 				count,
 				{
-					channelName,
+					conversationName,
 					count,
 				}
 			)
 		)
-		OCA.Mattermost.MattermostSendModalVue.success()
+		OCA.Wire.WireSendModalVue.success()
 		return
 	}
 
-	const file = OCA.Mattermost.filesToSend.shift()
+	const file = OCA.Wire.filesToSend.shift()
 	// skip directories
 	if (file.type === 'dir') {
-		sendFileLoop(channelId, channelName, count)
+		sendFileLoop(conversationId, conversationName, count)
 		return
 	}
-	OCA.Mattermost.MattermostSendModalVue.fileStarted(file.id)
+	OCA.Wire.WireSendModalVue.fileStarted(file.id)
 	const req = {
 		fileId: file.id,
-		channelId,
+		conversationId,
 	}
-	const url = generateUrl('apps/integration_mattermost/sendFile')
+	const url = generateUrl('apps/integration_wire/sendFile')
 	axios.post(url, req).then((response) => {
 		// finished
-		if (OCA.Mattermost.filesToSend.length === 0) {
+		if (OCA.Wire.filesToSend.length === 0) {
 			showSuccess(
 				n(
-					'integration_mattermost',
-					'{fileName} was sent to {channelName}',
-					'{count} files were sent to {channelName}',
+					'integration_wire',
+					'{fileName} was sent to {conversationName}',
+					'{count} files were sent to {conversationName}',
 					count + 1,
 					{
 						fileName: file.name,
-						channelName,
+						conversationName,
 						count: count + 1,
 					}
 				)
 			)
-			OCA.Mattermost.MattermostSendModalVue.success()
+			OCA.Wire.WireSendModalVue.success()
 		} else {
 			// not finished
-			OCA.Mattermost.MattermostSendModalVue.fileFinished(file.id)
-			sendFileLoop(channelId, channelName, count + 1)
+			OCA.Wire.WireSendModalVue.fileFinished(file.id)
+			sendFileLoop(conversationId, conversationName, count + 1)
 		}
 	}).catch((error) => {
 		console.error(error)
-		OCA.Mattermost.MattermostSendModalVue.failure()
-		OCA.Mattermost.filesToSend = []
+		OCA.Wire.WireSendModalVue.failure()
+		OCA.Wire.filesToSend = []
 		showError(
-			t('integration_mattermost', 'Failed to send {name} to Mattermost', { name: file.name })
+			t('integration_wire', 'Failed to send {name} to Wire', { name: file.name })
 			+ ' ' + error.response?.request?.responseText
 		)
 	})
 }
 
-function sendMessage(channelId, message) {
+function sendMessage(conversationId, message) {
 	const req = {
 		message,
-		channelId,
+		conversationId,
 	}
-	const url = generateUrl('apps/integration_mattermost/sendMessage')
+	const url = generateUrl('apps/integration_wire/sendMessage')
 	return axios.post(url, req)
 }
 
 // send file modal
-const modalId = 'mattermostSendModal'
+const modalId = 'wireSendModal'
 const modalElement = document.createElement('div')
 modalElement.id = modalId
 document.body.append(modalElement)
 
 const View = Vue.extend(SendFilesModal)
-OCA.Mattermost.MattermostSendModalVue = new View().$mount(modalElement)
+OCA.Wire.WireSendModalVue = new View().$mount(modalElement)
 
-OCA.Mattermost.MattermostSendModalVue.$on('closed', () => {
-	if (DEBUG) console.debug('[Mattermost] modal closed')
+OCA.Wire.WireSendModalVue.$on('closed', () => {
+	if (DEBUG) console.debug('[Wire] modal closed')
 })
-OCA.Mattermost.MattermostSendModalVue.$on('validate', ({ filesToSend, channelId, channelName, type, comment, permission, expirationDate, password }) => {
-	OCA.Mattermost.filesToSend = filesToSend
+OCA.Wire.WireSendModalVue.$on('validate', ({ filesToSend, conversationId, conversationName, type, comment, permission, expirationDate, password }) => {
+	OCA.Wire.filesToSend = filesToSend
 	if (type === 'link') {
-		sendLinks(channelId, channelName, comment, permission, expirationDate, password)
+		sendLinks(conversationId, conversationName, comment, permission, expirationDate, password)
 	} else {
-		sendMessage(channelId, comment).then((response) => {
-			sendFileLoop(channelId, channelName)
+		sendMessage(conversationId, comment).then((response) => {
+			sendFileLoop(conversationId, conversationName)
 		}).catch((error) => {
 			console.error(error)
-			OCA.Mattermost.MattermostSendModalVue.failure()
-			OCA.Mattermost.filesToSend = []
+			OCA.Wire.WireSendModalVue.failure()
+			OCA.Wire.filesToSend = []
 			showError(
-				t('integration_mattermost', 'Failed to send files to Mattermost')
+				t('integration_wire', 'Failed to send files to Wire')
 				+ ': ' + error.response?.request?.responseText
 			)
 		})
 	}
 })
 
-// get Mattermost state
-const urlCheckConnection = generateUrl('/apps/integration_mattermost/is-connected')
+// get Wire state
+const urlCheckConnection = generateUrl('/apps/integration_wire/is-connected')
 axios.get(urlCheckConnection).then((response) => {
-	OCA.Mattermost.mattermostConnected = response.data.connected
-	OCA.Mattermost.oauthPossible = response.data.oauth_possible
-	OCA.Mattermost.usePopup = response.data.use_popup
-	OCA.Mattermost.clientId = response.data.client_id
-	OCA.Mattermost.mattermostUrl = response.data.url
-	OCA.Mattermost.fileIdsToSendAfterOAuth = response.data.file_ids_to_send_after_oauth
-	OCA.Mattermost.currentDirAfterOAuth = response.data.current_dir_after_oauth
-	if (DEBUG) console.debug('[Mattermost] OCA.Mattermost', OCA.Mattermost)
-	OC.Plugins.register('OCA.Files.FileList', OCA.Mattermost.FilesPlugin)
+	OCA.Wire.wireConnected = response.data.connected
+	OCA.Wire.wireUrl = response.data.url
+	if (DEBUG) console.debug('[Wire] OCA.Wire', OCA.Wire)
+	OC.Plugins.register('OCA.Files.FileList', OCA.Wire.FilesPlugin)
 }).catch((error) => {
 	console.error(error)
 })

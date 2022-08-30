@@ -76,13 +76,13 @@ class ConfigController extends Controller {
 	 * @return DataResponse
 	 */
 	public function isUserConnected(): DataResponse {
-		$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url');
+		$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url', Application::DEFAULT_WIRE_API_URL) ?: Application::DEFAULT_WIRE_API_URL;
 		$userUrl = $this->config->getUserValue($this->userId, Application::APP_ID, 'url', $adminUrl) ?: $adminUrl;
 		$token = $this->config->getUserValue($this->userId, Application::APP_ID, 'token');
 		$cookie = $this->config->getUserValue($this->userId, Application::APP_ID, 'cookie');
 
 		return new DataResponse([
-			'connected' => $userUrl && $token && $cookie,
+			'connected' => $token && $cookie,
 			'url' => $userUrl,
 		]);
 	}
@@ -96,8 +96,21 @@ class ConfigController extends Controller {
 	 * @throws PreConditionNotMetException
 	 */
 	public function setConfig(array $values): DataResponse {
-		if (isset($values['url'], $values['login'], $values['password'])) {
-			return $this->loginWithCredentials($values['url'], $values['login'], $values['password']);
+		if (isset($values['login'], $values['password'])) {
+			return $this->loginWithCredentials($values['login'], $values['password']);
+		}
+
+		if (isset($values['token']) && $values['token'] === '') {
+			// revoke the token and the cookie
+			$revokeResult = $this->wireAPIService->request(
+				$this->userId, 'access/logout', [], 'POST',
+				false, true
+			);
+			if (isset($revokeResult['error'])) {
+				error_log('REVOKE ERROR ' . $revokeResult['error']);
+			} else {
+				error_log('REVOKE SUCCESS "' . $revokeResult['body'] . '"');
+			}
 		}
 
 		foreach ($values as $key => $value) {
@@ -106,13 +119,14 @@ class ConfigController extends Controller {
 		$result = [];
 
 		if (isset($values['token'])) {
-			if ($values['token'] && $values['token'] === '') {
+			if ($values['token'] === '') {
 				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'user_id');
 				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'user_name');
 				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'user_displayname');
 				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'token');
 				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'token_expires_at');
 				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'cookie');
+				$this->config->deleteUserValue($this->userId, Application::APP_ID, 'full-cookie');
 				$result['user_id'] = '';
 				$result['user_name'] = '';
 				$result['user_displayname'] = '';
@@ -122,33 +136,32 @@ class ConfigController extends Controller {
 	}
 
 	/**
-	 * @param string $url
 	 * @param string $login
 	 * @param string $password
 	 * @return DataResponse
 	 * @throws \OCP\PreConditionNotMetException
 	 */
-	private function loginWithCredentials(string $url, string $login, string $password): DataResponse {
+	private function loginWithCredentials(string $login, string $password): DataResponse {
 		// cleanup token, cookie and expiration date on classic login
 		$this->config->deleteUserValue($this->userId, Application::APP_ID, 'cookie');
 		$this->config->deleteUserValue($this->userId, Application::APP_ID, 'token');
 		$this->config->deleteUserValue($this->userId, Application::APP_ID, 'token_expires_at');
 
-		$result = $this->wireAPIService->login($url, $login, $password);
+		$result = $this->wireAPIService->login($this->userId, $login, $password);
 		if (isset($result['access_token'], $result['expires_in'], $result['user'])) {
-			$this->config->setUserValue($this->userId, Application::APP_ID, 'url', $url);
 			$this->config->setUserValue($this->userId, Application::APP_ID, 'token', $result['access_token']);
 			$nowTs = (new Datetime())->getTimestamp();
 			$expiresAt = $nowTs + (int) $result['expires_in'];
 			$this->config->setUserValue($this->userId, Application::APP_ID, 'token_expires_at', $expiresAt);
 			$this->config->setUserValue($this->userId, Application::APP_ID, 'cookie', $result['cookie']);
+			$this->config->setUserValue($this->userId, Application::APP_ID, 'full-cookie', $result['full-cookie']);
 
 			$this->config->setUserValue($this->userId, Application::APP_ID, 'user_id', $result['user'] ?? '');
 			$userInfo = $this->storeUserInfo();
 			return new DataResponse([
 				'user_id' => $result['user'] ?? '',
 				'user_name' => $userInfo['user_name'] ?? '',
-				'user_displayname' => $userInfo['name'] ?? '',
+				'user_displayname' => $userInfo['user_displayname'] ?? '',
 			]);
 		}
 		return new DataResponse([
@@ -188,8 +201,9 @@ class ConfigController extends Controller {
 				'user_displayname' => $info['name'] ?? '',
 			];
 		} else {
-			$this->config->setUserValue($this->userId, Application::APP_ID, 'user_id', '');
-			$this->config->setUserValue($this->userId, Application::APP_ID, 'user_name', '');
+			$this->config->deleteUserValue($this->userId, Application::APP_ID, 'user_id');
+			$this->config->deleteUserValue($this->userId, Application::APP_ID, 'user_name');
+			$this->config->deleteUserValue($this->userId, Application::APP_ID, 'user_displayname');
 			return [
 				'user_id' => '',
 				'user_name' => '',

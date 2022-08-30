@@ -22,6 +22,7 @@ use OCP\AppFramework\Controller;
 use OCA\Wire\Service\WireAPIService;
 use OCA\Wire\AppInfo\Application;
 use OCP\IURLGenerator;
+use OCP\PreConditionNotMetException;
 
 class WireAPIController extends Controller {
 
@@ -71,18 +72,20 @@ class WireAPIController extends Controller {
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 *
+	 * @param string $domain
 	 * @param string $userId
 	 * @param int $useFallback
 	 * @return DataDisplayResponse|RedirectResponse
+	 * @throws PreConditionNotMetException
 	 */
-	public function getUserAvatar(string $userId, int $useFallback = 1) {
-		$result = $this->wireAPIService->getUserAvatar($this->userId, $userId);
+	public function getUserAvatar(string $domain, string $userId, int $useFallback = 1) {
+		$result = $this->wireAPIService->getUserAvatar($this->userId, $domain, $userId);
 		if (isset($result['avatarContent'])) {
 			$response = new DataDisplayResponse($result['avatarContent']);
-			$response->cacheFor(60 * 60 * 24);
+//			$response->cacheFor(60 * 60 * 24);
 			return $response;
 		} elseif ($useFallback !== 0 && isset($result['userInfo'])) {
-			$userName = $result['userInfo']['username'] ?? '??';
+			$userName = $result['userInfo']['name'] ?? '??';
 			$fallbackAvatarUrl = $this->urlGenerator->linkToRouteAbsolute('core.GuestAvatar.getAvatar', ['guestName' => $userName, 'size' => 44]);
 			return new RedirectResponse($fallbackAvatarUrl);
 		}
@@ -94,19 +97,21 @@ class WireAPIController extends Controller {
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 *
+	 * @param string $domain
 	 * @param string $teamId
 	 * @param int $useFallback
 	 * @return DataDisplayResponse|RedirectResponse
+	 * @throws PreConditionNotMetException
 	 */
-	public function getTeamAvatar(string $teamId, int $useFallback = 1)	{
-		$result = $this->wireAPIService->getTeamAvatar($this->userId, $teamId);
+	public function getTeamAvatar(string $domain, string $teamId, int $useFallback = 1)	{
+		$result = $this->wireAPIService->getTeamAvatar($this->userId, $domain, $teamId);
 		if (isset($result['avatarContent'])) {
 			$response = new DataDisplayResponse($result['avatarContent']);
-			$response->cacheFor(60 * 60 * 24);
+//			$response->cacheFor(60 * 60 * 24);
 			return $response;
 		} elseif ($useFallback !== 0 && isset($result['teamInfo'])) {
-			$projectName = $result['teamInfo']['display_name'] ?? '??';
-			$fallbackAvatarUrl = $this->urlGenerator->linkToRouteAbsolute('core.GuestAvatar.getAvatar', ['guestName' => $projectName, 'size' => 44]);
+			$teamName = $result['teamInfo']['name'] ?? '??';
+			$fallbackAvatarUrl = $this->urlGenerator->linkToRouteAbsolute('core.GuestAvatar.getAvatar', ['guestName' => $teamName, 'size' => 44]);
 			return new RedirectResponse($fallbackAvatarUrl);
 		}
 		return new DataDisplayResponse('', Http::STATUS_NOT_FOUND);
@@ -114,19 +119,7 @@ class WireAPIController extends Controller {
 
 	/**
 	 * @return DataResponse
-	 */
-	public function getNotifications(?int $since = null) {
-		$mmUserName = $this->config->getUserValue($this->userId, Application::APP_ID, 'user_name');
-		$result = $this->wireAPIService->getMentionsMe($this->userId, $mmUserName, $since);
-		if (isset($result['error'])) {
-			return new DataResponse($result['error'], Http::STATUS_BAD_REQUEST);
-		} else {
-			return new DataResponse($result);
-		}
-	}
-
-	/**
-	 * @return DataResponse
+	 * @throws \Exception
 	 */
 	public function getConversations() {
 		$result = $this->wireAPIService->getMyConversations($this->userId);
@@ -141,6 +134,7 @@ class WireAPIController extends Controller {
 	 * @param string $message
 	 * @param string $conversationId
 	 * @return DataResponse
+	 * @throws \Exception
 	 */
 	public function sendMessage(string $message, string $conversationId) {
 		$result = $this->wireAPIService->sendMessage($this->userId, $message, $conversationId);
@@ -155,6 +149,7 @@ class WireAPIController extends Controller {
 	 * @param int $fileId
 	 * @param string $conversationId
 	 * @return DataResponse
+	 * @throws \Exception
 	 */
 	public function sendFile(int $fileId, string $conversationId) {
 		$result = $this->wireAPIService->sendFile($this->userId, $fileId, $conversationId);
@@ -167,18 +162,19 @@ class WireAPIController extends Controller {
 
 	/**
 	 * @param array $fileIds
-	 * @param string $channelId
-	 * @param string $channelName
+	 * @param string $conversationId
+	 * @param string $conversationName
 	 * @param string $comment
 	 * @param string $permission
 	 * @param string|null $expirationDate
 	 * @param string|null $password
 	 * @return DataResponse
+	 * @throws \Exception
 	 */
-	public function sendLinks(array $fileIds, string $channelId, string $channelName, string $comment,
+	public function sendLinks(array  $fileIds, string $conversationId, string $conversationName, string $comment,
 							  string $permission, ?string $expirationDate = null, ?string $password = null): DataResponse {
 		$result = $this->wireAPIService->sendLinks(
-			$this->userId, $fileIds, $channelId, $channelName,
+			$this->userId, $fileIds, $conversationId, $conversationName,
 			$comment, $permission, $expirationDate, $password
 		);
 		if (isset($result['error'])) {

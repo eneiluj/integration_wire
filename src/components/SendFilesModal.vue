@@ -1,15 +1,15 @@
 <template>
-	<div class="mattermost-modal-container">
+	<div class="wire-modal-container">
 		<Modal v-if="show"
 			size="normal"
 			@close="closeModal">
-			<div class="mattermost-modal-content">
+			<div class="wire-modal-content">
 				<h2 class="modal-title">
 					<WireIcon />
 					<span>
 						{{ sendType === 'file'
-							? n('integration_mattermost', 'Send file to Mattermost', 'Send files to Mattermost', files.length)
-							: n('integration_mattermost', 'Send link to Mattermost', 'Send links to Mattermost', files.length)
+							? n('integration_wire', 'Send file to Wire', 'Send files to Wire', files.length)
+							: n('integration_wire', 'Send link to Wire', 'Send links to Wire', files.length)
 						}}
 					</span>
 				</h2>
@@ -17,7 +17,7 @@
 					<FileIcon />
 					<span>
 						<strong>
-							{{ t('integration_mattermost', 'Files') }}
+							{{ t('integration_wire', 'Files') }}
 						</strong>
 					</span>
 				</span>
@@ -54,41 +54,41 @@
 					<PoundBoxIcon />
 					<span>
 						<strong>
-							{{ t('integration_mattermost', 'Channel') }}
+							{{ t('integration_wire', 'Conversation') }}
 						</strong>
 					</span>
 				</span>
 				<Multiselect
-					v-model="selectedChannel"
-					:placeholder="t('integration_mattermost', 'Choose a channel')"
-					:options="channels"
+					v-model="selectedConversation"
+					:placeholder="t('integration_wire', 'Choose a conversation')"
+					:options="conversations"
 					:user-select="true"
-					label="display_name"
+					label="name"
 					track-by="id"
 					:internal-search="true"
-					class="channel-select"
+					class="conversation-select"
 					@search-change="query = $event">
 					<template #option="{option}">
 						<Avatar
 							:size="34"
-							:url="getTeamIconUrl(option.team_id)"
+							:url="getConversationIconUrl(option)"
 							display-name="#" />
 						<Highlight
-							:text="t('integration_mattermost', '[{teamName}] {channelName}', { channelName: option.display_name, teamName: option.team_display_name })"
+							:text="t('integration_wire', '[{teamName}] {conversationName}', { conversationName: option.name, teamName: option.team_name })"
 							:search="query"
 							class="multiselect-name" />
 					</template>
 					<template #singleLabel="{option}">
 						<Avatar
 							:size="34"
-							:url="getTeamIconUrl(option.team_id)"
+							:url="getConversationIconUrl(option)"
 							display-name="#" />
 						<span class="multiselect-name">
-							{{ t('integration_mattermost', '[{teamName}] {channelName}', { channelName: option.display_name, teamName: option.team_display_name }) }}
+							{{ t('integration_wire', '[{teamName}] {conversationName}', { conversationName: option.name, teamName: option.team_name }) }}
 						</span>
 					</template>
 					<template #noOptions>
-						{{ t('integration_mattermost', 'Start typing to search') }}
+						{{ t('integration_wire', 'Start typing to search') }}
 					</template>
 				</Multiselect>
 				<div class="advanced-options">
@@ -96,7 +96,7 @@
 						<PackageUpIcon />
 						<span>
 							<strong>
-								{{ t('integration_mattermost', 'Type') }}
+								{{ t('integration_wire', 'Type') }}
 							</strong>
 						</span>
 					</span>
@@ -108,7 +108,7 @@
 							type="radio">
 							<FileIcon :size="20" />
 							<span class="option-title">
-								{{ t('integration_mattermost', 'Upload files') }}
+								{{ t('integration_wire', 'Upload files') }}
 							</span>
 						</CheckboxRadioSwitch>
 						<CheckboxRadioSwitch
@@ -118,7 +118,7 @@
 							type="radio">
 							<LinkVariantIcon :size="20" />
 							<span class="option-title">
-								{{ t('integration_mattermost', 'Public links') }}
+								{{ t('integration_wire', 'Public links') }}
 							</span>
 						</CheckboxRadioSwitch>
 					</div>
@@ -138,20 +138,20 @@
 					<div v-show="sendType === 'link'"
 						class="expiration-field">
 						<CheckboxRadioSwitch :checked.sync="expirationEnabled">
-							{{ t('integration_mattermost', 'Set expiration date') }}
+							{{ t('integration_wire', 'Set expiration date') }}
 						</CheckboxRadioSwitch>
 						<div class="spacer" />
 						<DatetimePicker v-show="expirationEnabled"
 							id="expiration-datepicker"
 							v-model="expirationDate"
 							:disabled-date="isDateDisabled"
-							:placeholder="t('integration_mattermost', 'Expires on')"
+							:placeholder="t('integration_wire', 'Expires on')"
 							:clearable="true" />
 					</div>
 					<div v-show="sendType === 'link'"
 						class="password-field">
 						<CheckboxRadioSwitch :checked.sync="passwordEnabled">
-							{{ t('integration_mattermost', 'Set link password') }}
+							{{ t('integration_wire', 'Set link password') }}
 						</CheckboxRadioSwitch>
 						<div class="spacer" />
 						<input v-show="passwordEnabled"
@@ -164,7 +164,7 @@
 						<CommentIcon />
 						<span>
 							<strong>
-								{{ t('integration_mattermost', 'Comment') }}
+								{{ t('integration_wire', 'Comment') }}
 							</strong>
 						</span>
 					</span>
@@ -178,14 +178,14 @@
 					class="warning-container">
 					<AlertBoxIcon class="warning-icon" />
 					<label>
-						{{ t('integration_mattermost', 'Directories will be skipped, they can only be sent as links.') }}
+						{{ t('integration_wire', 'Directories will be skipped, they can only be sent as links.') }}
 					</label>
 				</span>
-				<div class="mattermost-footer">
+				<div class="wire-footer">
 					<div class="spacer" />
 					<NcButton
 						@click="closeModal">
-						{{ t('integration_mattermost', 'Cancel') }}
+						{{ t('integration_wire', 'Cancel') }}
 					</NcButton>
 					<NcButton type="primary"
 						:class="{ loading, okButton: true }"
@@ -195,8 +195,8 @@
 							<SendIcon />
 						</template>
 						{{ sendType === 'file'
-							? n('integration_mattermost', 'Send file', 'Send files', files.length)
-							: n('integration_mattermost', 'Send link', 'Send links', files.length)
+							? n('integration_wire', 'Send file', 'Send files', files.length)
+							: n('integration_wire', 'Send link', 'Send links', files.length)
 						}}
 					</NcButton>
 				</div>
@@ -274,19 +274,19 @@ export default {
 			query: '',
 			files: [],
 			fileStates: {},
-			channels: [],
-			selectedChannel: null,
+			conversations: [],
+			selectedConversation: null,
 			selectedPermission: 'view',
 			expirationEnabled: false,
 			expirationDate: null,
 			passwordEnabled: false,
 			password: '',
-			passwordPlaceholder: t('integration_mattermost', 'password'),
+			passwordPlaceholder: t('integration_wire', 'password'),
 			STATES,
-			commentPlaceholder: t('integration_mattermost', 'Message to send with the files'),
+			commentPlaceholder: t('integration_wire', 'Message to send with the files'),
 			permissionOptions: {
-				view: { label: t('integration_mattermost', 'View only'), icon: EyeIcon },
-				edit: { label: t('integration_mattermost', 'Edit'), icon: PencilIcon },
+				view: { label: t('integration_wire', 'View only'), icon: EyeIcon },
+				edit: { label: t('integration_wire', 'Edit'), icon: PencilIcon },
 			},
 		}
 	},
@@ -299,7 +299,7 @@ export default {
 			return this.files.filter((f) => f.type !== 'dir').length === 0
 		},
 		canValidate() {
-			return this.selectedChannel !== null
+			return this.selectedConversation !== null
 				&& (this.sendType !== 'file' || !this.onlyDirectories)
 				&& this.files.length > 0
 		},
@@ -314,10 +314,10 @@ export default {
 
 	methods: {
 		reset() {
-			this.selectedChannel = null
+			this.selectedConversation = null
 			this.files = []
 			this.fileStates = {}
-			this.channels = []
+			this.conversations = []
 			this.comment = ''
 			this.sendType = 'file'
 			this.selectedPermission = 'view'
@@ -341,8 +341,8 @@ export default {
 			this.loading = true
 			this.$emit('validate', {
 				filesToSend: [...this.files],
-				channelId: this.selectedChannel.id,
-				channelName: this.selectedChannel.display_name,
+				conversationId: this.selectedConversation.id,
+				conversatonName: this.selectedConversation.name,
 				type: this.sendType,
 				comment: this.comment,
 				permission: this.selectedPermission,
@@ -357,10 +357,10 @@ export default {
 		failure() {
 			this.loading = false
 		},
-		updateChannels() {
-			const url = generateUrl('apps/integration_mattermost/channels')
+		updateConversations() {
+			const url = generateUrl('apps/integration_wire/conversations')
 			axios.get(url).then((response) => {
-				this.channels = response.data
+				this.conversations = response.data
 			}).catch((error) => {
 				console.error(error)
 			})
@@ -369,7 +369,7 @@ export default {
 			if (fileType === 'dir') {
 				return generateUrl('/apps/theming/img/core/filetypes/folder.svg')
 			}
-			return generateUrl('/apps/integration_mattermost/preview?id={fileId}&x=100&y=100', { fileId })
+			return generateUrl('/apps/integration_wire/preview?id={fileId}&x=100&y=100', { fileId })
 		},
 		fileStarted(id) {
 			this.$set(this.fileStates, id, STATES.IN_PROGRESS)
@@ -377,8 +377,26 @@ export default {
 		fileFinished(id) {
 			this.$set(this.fileStates, id, STATES.FINISHED)
 		},
-		getTeamIconUrl(teamId) {
-			return generateUrl('/apps/integration_mattermost/teams/{teamId}/image', { teamId }) + '?useFallback=0'
+		getConversationIconUrl(conversation) {
+			// 1-1
+			if (conversation.members?.others?.length === 1) {
+				return this.getUserIconUrl(conversation.members?.others[0])
+			} else if (conversation.members?.others?.length === 0) {
+				return this.getTeamIconUrl(conversation)
+			}
+			return this.getTeamIconUrl(conversation)
+		},
+		getTeamIconUrl(conversation) {
+			return generateUrl(
+				'/apps/integration_wire/teams/{domain}/{teamId}/image?useFallback=1',
+				{ domain: conversation.qualified_id.domain, teamId: conversation.team }
+			)
+		},
+		getUserIconUrl(user) {
+			return generateUrl(
+				'/apps/integration_wire/users/{domain}/{userId}/image?useFallback=1',
+				{ domain: user.qualified_id.domain, userId: user.qualified_id.id }
+			)
 		},
 		isDateDisabled(d) {
 			const now = new Date()
@@ -396,7 +414,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.mattermost-modal-content {
+.wire-modal-content {
 	width: 100%;
 	padding: 16px;
 	display: flex;
@@ -415,7 +433,7 @@ export default {
 		}
 	}
 
-	> *:not(.field-label):not(.advanced-options):not(.mattermost-footer):not(.warning-container),
+	> *:not(.field-label):not(.advanced-options):not(.wire-footer):not(.warning-container),
 	.advanced-options > *:not(.field-label) {
 		margin-left: 10px;
 	}
@@ -502,7 +520,7 @@ export default {
 		width: 250px;
 	}
 
-	.channel-select {
+	.conversation-select {
 		height: 44px;
 	}
 
@@ -524,7 +542,7 @@ export default {
 	flex-grow: 1;
 }
 
-.mattermost-footer {
+.wire-footer {
 	display: flex;
 	padding-bottom: 16px;
 	> * {

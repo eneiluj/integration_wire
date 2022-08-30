@@ -35,6 +35,7 @@ use OCP\Util;
 class Application extends App implements IBootstrap {
 	public const APP_ID = 'integration_wire';
 	public const DEFAULT_WIRE_API_URL = 'https://prod-nginz-https.wire.com';
+	public const DEFAULT_WIRE_WEB_URL = 'https://app.wire.com';
 
 	public const INTEGRATION_USER_AGENT = 'Nextcloud Wire integration';
 
@@ -71,7 +72,7 @@ class Application extends App implements IBootstrap {
 			$container = $this->getContainer();
 
 			if ($this->config->getUserValue($userId, self::APP_ID, 'navigation_enabled', '0') === '1') {
-				$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url');
+				$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url', self::DEFAULT_WIRE_WEB_URL) ?: self::DEFAULT_WIRE_WEB_URL;
 				$userUrl = $this->config->getUserValue($userId, self::APP_ID, 'url', $adminUrl) ?: $adminUrl;
 				if ($userUrl === '') {
 					return;
