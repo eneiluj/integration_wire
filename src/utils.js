@@ -1,6 +1,6 @@
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
-import { showError } from '@nextcloud/dialogs'
+import { showError, showSuccess } from '@nextcloud/dialogs'
 
 let mytimer = 0
 export function delay(callback, ms) {
@@ -14,74 +14,58 @@ export function delay(callback, ms) {
 	}
 }
 
-export function oauthConnect(mattermostUrl, clientId, oauthOrigin, usePopup = false) {
-	const redirectUri = window.location.protocol + '//' + window.location.host + generateUrl('/apps/integration_mattermost/oauth-redirect')
-
-	const oauthState = Math.random().toString(36).substring(3)
-	const requestUrl = mattermostUrl + '/oauth/authorize'
-		+ '?client_id=' + encodeURIComponent(clientId)
-		+ '&redirect_uri=' + encodeURIComponent(redirectUri)
-		+ '&response_type=code'
-		+ '&state=' + encodeURIComponent(oauthState)
-	// + '&scope=' + encodeURIComponent('read_user read_api read_repository')
-
-	const req = {
-		values: {
-			oauth_state: oauthState,
-			redirect_uri: redirectUri,
-			oauth_origin: usePopup ? undefined : oauthOrigin,
-		},
-	}
-	const url = generateUrl('/apps/integration_mattermost/config')
+export function login(login, password) {
 	return new Promise((resolve, reject) => {
+		const req = {
+			values: {
+				login,
+				password,
+			},
+		}
+		const url = generateUrl('/apps/integration_wire/config')
 		axios.put(url, req).then((response) => {
-			if (usePopup) {
-				const ssoWindow = window.open(
-					requestUrl,
-					t('integration_mattermost', 'Sign in with Mattermost'),
-					'toolbar=no, menubar=no, width=600, height=700')
-				ssoWindow.focus()
-				window.addEventListener('message', (event) => {
-					console.debug('Child window message received', event)
-					resolve(event.data)
-				})
-			} else {
-				window.location.replace(requestUrl)
+			if (response.data?.user_name) {
+				showSuccess(t('integration_wire', 'Successfully connected to Wire!'))
+				resolve(response.data?.user_name)
+				return
 			}
+			showError(t('integration_wire', 'Invalid login/password'))
+			resolve(null)
 		}).catch((error) => {
 			showError(
-				t('integration_mattermost', 'Failed to save Mattermost OAuth state')
+				t('integration_wire', 'Failed to connect to Wire')
 				+ ': ' + (error.response?.request?.responseText ?? '')
 			)
 			console.error(error)
+			reject(error)
 		})
 	})
 }
 
-export function oauthConnectConfirmDialog(mattermostUrl) {
+export function connectConfirmDialog(wireUrl) {
 	return new Promise((resolve, reject) => {
 		const settingsLink = generateUrl('/settings/user/connected-accounts')
-		const linkText = t('integration_mattermost', 'Connected accounts')
+		const linkText = t('integration_wire', 'Connected accounts')
 		const settingsHtmlLink = `<a href="${settingsLink}" class="external">${linkText}</a>`
 		OC.dialogs.message(
-			t('integration_mattermost', 'You need to connect before using the Mattermost integration.')
+			t('integration_wire', 'You need to connect before using the Wire integration.')
 			+ '<br><br>'
-			+ t('integration_mattermost', 'Do you want to connect to {mmUrl}?', { mmUrl: mattermostUrl })
+			+ t('integration_wire', 'Do you want to connect to {wireUrl}?', { wireUrl })
 			+ '<br><br>'
 			+ t(
-				'integration_mattermost',
-				'You can choose another Mattermost server in the {settingsHtmlLink} section of your personal settings.',
+				'integration_wire',
+				'You can choose another Wire server in the {settingsHtmlLink} section of your personal settings.',
 				{ settingsHtmlLink },
 				null,
 				{ escape: false }
 			),
-			t('integration_mattermost', 'Connect to Mattermost'),
+			t('integration_wire', 'Connect to Wire'),
 			'none',
 			{
 				type: OC.dialogs.YES_NO_BUTTONS,
-				confirm: t('integration_mattermost', 'Connect'),
+				confirm: t('integration_wire', 'Connect'),
 				confirmClasses: 'success',
-				cancel: t('integration_mattermost', 'Cancel'),
+				cancel: t('integration_wire', 'Cancel'),
 			},
 			(result) => {
 				resolve(result)

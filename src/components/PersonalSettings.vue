@@ -171,7 +171,7 @@ export default {
 					if (this.login && this.password && response.data.user_name === '') {
 						showError(t('integration_wire', 'Invalid login/password'))
 					} else if (response.data.user_name) {
-						showSuccess(t('integration_wire', 'Successfully connected to Mattermost!'))
+						showSuccess(t('integration_wire', 'Successfully connected to Wire!'))
 						this.state.user_id = response.data.user_id
 						this.state.user_name = response.data.user_name
 						this.state.user_displayname = response.data.user_displayname
@@ -182,7 +182,7 @@ export default {
 				}
 			}).catch((error) => {
 				showError(
-					t('integration_wire', 'Failed to save Mattermost options')
+					t('integration_wire', 'Failed to save Wire options')
 					+ ': ' + (error.response?.request?.responseText ?? '')
 				)
 				console.error(error)

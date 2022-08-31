@@ -8,12 +8,15 @@
  *
  */
 import SendFilesModal from './components/SendFilesModal.vue'
+import LoginModal from './components/LoginModal.vue'
 
 import axios from '@nextcloud/axios'
 import moment from '@nextcloud/moment'
 import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import { translate as t, translatePlural as n } from '@nextcloud/l10n'
+
+import { connectConfirmDialog, login } from './utils.js'
 
 import Vue from 'vue'
 import './bootstrap.js'
@@ -26,6 +29,11 @@ function openConversationSelector(files) {
 	modalVue.updateConversations()
 	modalVue.setFiles([...files])
 	modalVue.showModal()
+}
+
+function openLoginModal(files) {
+	OCA.Wire.filesBeforeLogin = files
+	OCA.Wire.WireLoginModalVue.showModal(OCA.Wire.wireDisplayUrl)
 }
 
 (function() {
@@ -56,15 +64,10 @@ function openConversationSelector(files) {
 			fileList.registerMultiSelectFileAction({
 				name: 'WireSendMulti',
 				displayName: (context) => {
-					if (OCA.Wire.wireConnected) {
-						return t('integration_wire', 'Send files to Wire')
-					}
-					return ''
+					return t('integration_wire', 'Send files to Wire')
 				},
 				iconClass: () => {
-					if (OCA.Wire.wireConnected) {
-						return 'icon-wire'
-					}
+					return 'icon-wire'
 				},
 				order: -2,
 				action: (selectedFiles) => {
@@ -87,17 +90,12 @@ function openConversationSelector(files) {
 			fileList.fileActions.registerAction({
 				name: 'wireSendSingle',
 				displayName: (context) => {
-					if (OCA.Wire.wireConnected) {
-						return t('integration_wire', 'Send to Wire')
-					}
-					return ''
+					return t('integration_wire', 'Send to Wire')
 				},
 				mime: 'all',
 				order: -139,
 				iconClass: (fileName, context) => {
-					if (OCA.Wire.wireConnected) {
-						return 'icon-wire'
-					}
+					return 'icon-wire'
 				},
 				permissions: OC.PERMISSION_READ,
 				actionHandler: (fileName, context) => {
@@ -120,6 +118,14 @@ function openConversationSelector(files) {
 
 		connectToWire: (selectedFiles = []) => {
 			console.debug('[WIRE] connect')
+			connectConfirmDialog(OCA.Wire.wireDisplayUrl).then((result) => {
+				if (result) {
+					console.debug('accepted')
+					openLoginModal(selectedFiles)
+				} else {
+					console.debug('refused')
+				}
+			})
 		},
 	}
 
@@ -271,8 +277,38 @@ const urlCheckConnection = generateUrl('/apps/integration_wire/is-connected')
 axios.get(urlCheckConnection).then((response) => {
 	OCA.Wire.wireConnected = response.data.connected
 	OCA.Wire.wireUrl = response.data.url
+	OCA.Wire.wireDisplayUrl = response.data.display_url
 	if (DEBUG) console.debug('[Wire] OCA.Wire', OCA.Wire)
+
 	OC.Plugins.register('OCA.Files.FileList', OCA.Wire.FilesPlugin)
+
+	// login modal
+	const loginModalId = 'wireLoginModal'
+	const loginModalElement = document.createElement('div')
+	loginModalElement.id = loginModalId
+	document.body.append(loginModalElement)
+
+	const LoginView = Vue.extend(LoginModal)
+	OCA.Wire.WireLoginModalVue = new LoginView({
+		data: {
+			wireUrl: OCA.Wire.wireDisplayUrl,
+		},
+	}).$mount(loginModalElement)
+
+	OCA.Wire.WireLoginModalVue.$on('closed', () => {
+		if (DEBUG) console.debug('[Wire] login modal closed')
+	})
+
+	const mlogin = login
+	OCA.Wire.WireLoginModalVue.$on('validate', ({ login, password }) => {
+		mlogin(login, password).then(loginResponse => {
+			console.debug('login response', loginResponse)
+			if (loginResponse) {
+				OCA.Wire.wireConnected = true
+				openConversationSelector(OCA.Wire.filesBeforeLogin)
+			}
+		})
+	})
 }).catch((error) => {
 	console.error(error)
 })

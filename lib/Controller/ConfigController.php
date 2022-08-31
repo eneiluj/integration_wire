@@ -81,9 +81,14 @@ class ConfigController extends Controller {
 		$token = $this->config->getUserValue($this->userId, Application::APP_ID, 'token');
 		$cookie = $this->config->getUserValue($this->userId, Application::APP_ID, 'cookie');
 
+		$userDisplayUrl = $userUrl === Application::DEFAULT_WIRE_API_URL
+			? Application::DEFAULT_WIRE_WEB_URL
+			: $userUrl;
+
 		return new DataResponse([
 			'connected' => $token && $cookie,
 			'url' => $userUrl,
+			'display_url' => $userDisplayUrl,
 		]);
 	}
 
