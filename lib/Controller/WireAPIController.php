@@ -132,12 +132,13 @@ class WireAPIController extends Controller {
 
 	/**
 	 * @param string $message
+	 * @param string $conversationDomain
 	 * @param string $conversationId
 	 * @return DataResponse
 	 * @throws \Exception
 	 */
-	public function sendMessage(string $message, string $conversationId) {
-		$result = $this->wireAPIService->sendMessage($this->userId, $message, $conversationId);
+	public function sendMessage(string $message, string $conversationDomain, string $conversationId) {
+		$result = $this->wireAPIService->sendMessage($this->userId, $message, $conversationDomain, $conversationId);
 		if (isset($result['error'])) {
 			return new DataResponse($result['error'], Http::STATUS_BAD_REQUEST);
 		} else {

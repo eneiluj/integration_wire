@@ -283,35 +283,22 @@ class WireAPIService {
 
 	/**
 	 * @param string $userId
-	 * @param string $message
-	 * @param string $channelId
-	 * @return array|string[]
-	 * @throws Exception
-	 */
-	public function sendMessage(string $userId, string $message, string $channelId): array {
-		$params = [
-			'channel_id' => $channelId,
-			'message' => $message,
-		];
-		return $this->request($userId, 'posts', $params, 'POST');
-	}
-
-	/**
-	 * @param string $userId
 	 * @param array $fileIds
-	 * @param string $channelId
+	 * @param string $conversationDomain
+	 * @param string $conversationId
 	 * @param string $conversationName
 	 * @param string $comment
 	 * @param string $permission
 	 * @param string|null $expirationDate
 	 * @param string|null $password
 	 * @return array|string[]
-	 * @throws NotPermittedException
 	 * @throws NoUserException
+	 * @throws NotPermittedException
+	 * @throws PreConditionNotMetException
 	 */
 	public function sendLinks(string $userId, array $fileIds,
-							  string $channelId, string $conversationName, string $comment,
-							  string $permission, ?string $expirationDate = null, ?string $password = null): array {
+							  string $conversationDomain, string $conversationId, string $conversationName,
+							  string $comment, string $permission, ?string $expirationDate = null, ?string $password = null): array {
 		$links = [];
 		$userFolder = $this->root->getUserFolder($userId);
 
@@ -361,11 +348,7 @@ class WireAPIService {
 			foreach ($links as $link) {
 				$message .= '```' . $link['name'] . '```: ' . $link['url'] . "\n";
 			}
-			$params = [
-				'channel_id' => $channelId,
-				'message' => $message,
-			];
-			return $this->request($userId, 'posts', $params, 'POST');
+			return $this->sendMessage($userId, $message, $conversationDomain, $conversationId);
 		} else {
 			return ['error' => 'Files not found'];
 		}
@@ -373,76 +356,21 @@ class WireAPIService {
 
 	/**
 	 * @param string $userId
-	 * @param int $fileId
-	 * @param string $channelId
+	 * @param string $message
+	 * @param string $conversationDomain
+	 * @param string $conversationId
 	 * @return array|string[]
-	 * @throws \OCP\Files\NotPermittedException
-	 * @throws \OCP\Lock\LockedException
-	 * @throws \OC\User\NoUserException
+	 * @throws PreConditionNotMetException
 	 */
-	public function sendFile(string $userId, int $fileId, string $channelId): array {
-		$userFolder = $this->root->getUserFolder($userId);
-		$files = $userFolder->getById($fileId);
-		if (count($files) > 0 && $files[0] instanceof File) {
-			$file = $files[0];
-			$endpoint = 'files?channel_id=' . urlencode($channelId) . '&filename=' . urlencode($file->getName());
-			$sendResult = $this->requestSendFile($userId, $endpoint, $file->fopen('r'));
-			if (isset($sendResult['error'])) {
-				return $sendResult;
-			}
-
-			if (isset($sendResult['file_infos']) && is_array($sendResult['file_infos']) && count($sendResult['file_infos']) > 0) {
-				$remoteFileId = $sendResult['file_infos'][0]['id'] ?? 0;
-				$params = [
-					'channel_id' => $channelId,
-					'message' => '',
-					'file_ids' => [$remoteFileId],
-				];
-				return $this->request($userId, 'posts', $params, 'POST');
-			} else {
-				return ['error' => 'File upload error'];
-			}
-		} else {
-			return ['error' => 'File not found'];
-		}
-	}
-
-	/**
-	 * @param string $userId
-	 * @param string $endPoint
-	 * @param $fileResource
-	 * @return array|mixed|resource|string|string[]
-	 * @throws Exception
-	 */
-	public function requestSendFile(string $userId, string $endPoint, $fileResource) {
-		$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url') ?: Application::DEFAULT_WIRE_API_URL;
-		$url = $this->config->getUserValue($userId, Application::APP_ID, 'url', $adminUrl) ?: $adminUrl;
-
-		$this->checkTokenExpiration($userId, $url);
-		$accessToken = $this->config->getUserValue($userId, Application::APP_ID, 'token');
-		try {
-			$url = $url . '/' . $endPoint;
-			$options = [
-				'headers' => [
-					'Authorization'  => 'Bearer ' . $accessToken,
-					'User-Agent'  => Application::INTEGRATION_USER_AGENT,
-				],
-				'body' => $fileResource,
-			];
-
-			$response = $this->client->post($url, $options);
-			$body = $response->getBody();
-			$respCode = $response->getStatusCode();
-
-			if ($respCode >= 400) {
-				return ['error' => $this->l10n->t('Bad credentials')];
-			} else {
-				return json_decode($body, true);
-			}
-		} catch (ServerException | ClientException $e) {
-			$this->logger->warning('Wire API send file error : '.$e->getMessage(), ['app' => Application::APP_ID]);
-			return ['error' => $e->getMessage()];
-		}
+	public function sendMessage(string $userId, string $message, string $conversationDomain, string $conversationId): array {
+		// TODO generate an encrypted message for all target user's devices
+		// concept briefly explained there: https://docs.wire.com/understand/federation/api.html?highlight=send#message-sending-a
+		// not enough information in https://staging-nginz-https.zinfra.io/api/swagger-ui/#/default/post_conversations__cnv_domain___cnv__proteus_messages
+		$body = $message;
+		return $this->request(
+			$userId, 'conversations/' . $conversationDomain . '/' . $conversationId . '/proteus/messages',
+			[], 'POST', true, false, 'application/x-protobuf', $body
+		);
 	}
 
 	/**
@@ -452,11 +380,14 @@ class WireAPIService {
 	 * @param string $method
 	 * @param bool $jsonResponse
 	 * @param bool $useCookie
+	 * @param string $contentType
+	 * @param string|null $requestBody
 	 * @return array|mixed|resource|string|string[]
 	 * @throws PreConditionNotMetException
 	 */
 	public function request(string $userId, string $endPoint, array $params = [], string $method = 'GET',
-							bool $jsonResponse = true, bool $useCookie = false): array {
+							bool $jsonResponse = true, bool $useCookie = false,
+							string $contentType = 'application/json', ?string $requestBody = null): array {
 		$adminUrl = $this->config->getAppValue(Application::APP_ID, 'url') ?: Application::DEFAULT_WIRE_API_URL;
 		$url = $this->config->getUserValue($userId, Application::APP_ID, 'url', $adminUrl) ?: $adminUrl;
 
@@ -468,7 +399,7 @@ class WireAPIService {
 			$options = [
 				'headers' => [
 					'Authorization'  => 'Bearer ' . $accessToken,
-					'Content-Type' => 'application/json',
+					'Content-Type' => $contentType,
 					'User-Agent'  => Application::INTEGRATION_USER_AGENT,
 				],
 			];
@@ -494,7 +425,9 @@ class WireAPIService {
 
 					$url .= '?' . $paramsContent;
 				} else {
-					$options['body'] = json_encode($params);
+					$options['body'] = $requestBody === null
+						? json_encode($params)
+						: $requestBody;
 				}
 			}
 

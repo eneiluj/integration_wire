@@ -15,7 +15,7 @@ return [
 		['name' => 'config#setConfig', 'url' => '/config', 'verb' => 'PUT'],
 		['name' => 'config#setAdminConfig', 'url' => '/admin-config', 'verb' => 'PUT'],
 
-		['name' => 'wireAPI#sendMessage', 'url' => '/sendMessage', 'verb' => 'POST'],
+		['name' => 'wireAPI#sendMessage', 'url' => '/conversations/{conversationDomain}/{conversationId}/proteus/messages', 'verb' => 'POST'],
 		['name' => 'wireAPI#sendLinks', 'url' => '/sendLinks', 'verb' => 'POST'],
 		['name' => 'wireAPI#sendFile', 'url' => '/sendFile', 'verb' => 'POST'],
 		['name' => 'wireAPI#getConversations', 'url' => '/conversations', 'verb' => 'GET'],
