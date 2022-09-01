@@ -75,6 +75,10 @@ export default {
 	},
 
 	props: {
+		wireUrl: {
+			type: String,
+			required: true,
+		},
 	},
 
 	data() {
@@ -82,7 +86,6 @@ export default {
 			show: false,
 			login: '',
 			password: '',
-			// wireUrl: '',
 		}
 	},
 

@@ -290,7 +290,7 @@ axios.get(urlCheckConnection).then((response) => {
 
 	const LoginView = Vue.extend(LoginModal)
 	OCA.Wire.WireLoginModalVue = new LoginView({
-		data: {
+		propsData: {
 			wireUrl: OCA.Wire.wireDisplayUrl,
 		},
 	}).$mount(loginModalElement)
