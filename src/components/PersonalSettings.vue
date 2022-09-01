@@ -4,12 +4,6 @@
 			<WireIcon class="icon" />
 			{{ t('integration_wire', 'Wire integration') }}
 		</h2>
-		<CheckboxRadioSwitch
-			class="top-element"
-			:checked.sync="state.navigation_enabled"
-			@update:checked="onCheckboxChanged($event, 'navigation_enabled')">
-			{{ t('integration_wire', 'Enable navigation link') }}
-		</CheckboxRadioSwitch>
 		<br>
 		<div id="wire-content">
 			<div id="mattermost-connect-block">
@@ -72,6 +66,13 @@
 						{{ t('integration_wire', 'Disconnect from Wire') }}
 					</NcButton>
 				</div>
+				<br>
+				<CheckboxRadioSwitch
+					class="top-element"
+					:checked.sync="state.navigation_enabled"
+					@update:checked="onCheckboxChanged($event, 'navigation_enabled')">
+					{{ t('integration_wire', 'Enable navigation link') }}
+				</CheckboxRadioSwitch>
 			</div>
 		</div>
 	</div>
@@ -234,7 +235,7 @@ export default {
 			align-items: center;
 		}
 		> input {
-			width: 250px;
+			width: 300px;
 		}
 	}
 }

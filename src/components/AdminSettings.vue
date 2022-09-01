@@ -19,7 +19,7 @@
 			<br>
 			<p class="settings-hint">
 				<InformationOutlineIcon :size="20" class="icon" />
-				{{ t('integration_wire', 'Leave this empty to use https://wire.com') }}
+				{{ t('integration_wire', 'Leave this empty to use {url}', { url: 'https://app.wire.com' }) }}
 			</p>
 		</div>
 	</div>
