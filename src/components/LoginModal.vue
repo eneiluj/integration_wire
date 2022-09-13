@@ -1,6 +1,6 @@
 <template>
 	<div class="wire-modal-container">
-		<Modal v-if="show"
+		<NcModal v-if="show"
 			size="small"
 			@close="closeModal">
 			<div class="wire-modal-content">
@@ -48,13 +48,13 @@
 					</NcButton>
 				</div>
 			</div>
-		</Modal>
+		</NcModal>
 	</div>
 </template>
 
 <script>
-import Modal from '@nextcloud/vue/dist/Components/Modal.js'
-import NcButton from '@nextcloud/vue/dist/Components/Button.js'
+import NcModal from '@nextcloud/vue/dist/Components/NcModal.js'
+import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
 
 import LockIcon from 'vue-material-design-icons/Lock.vue'
 import AccountIcon from 'vue-material-design-icons/Account.vue'
@@ -67,7 +67,7 @@ export default {
 
 	components: {
 		WireIcon,
-		Modal,
+		NcModal,
 		NcButton,
 		LoginVariantIcon,
 		LockIcon,

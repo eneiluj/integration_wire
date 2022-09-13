@@ -1,6 +1,6 @@
 <template>
 	<div class="wire-modal-container">
-		<Modal v-if="show"
+		<NcModal v-if="show"
 			size="normal"
 			@close="closeModal">
 			<div class="wire-modal-content">
@@ -58,7 +58,7 @@
 						</strong>
 					</span>
 				</span>
-				<Multiselect
+				<NcMultiselect
 					v-model="selectedConversation"
 					:placeholder="t('integration_wire', 'Choose a conversation')"
 					:options="conversations"
@@ -69,17 +69,17 @@
 					class="conversation-select"
 					@search-change="query = $event">
 					<template #option="{option}">
-						<Avatar
+						<NcAvatar
 							:size="34"
 							:url="getConversationIconUrl(option)"
 							display-name="#" />
-						<Highlight
+						<NcHighlight
 							:text="t('integration_wire', '[{teamName}] {conversationName}', { conversationName: option.name, teamName: option.team_name })"
 							:search="query"
 							class="multiselect-name" />
 					</template>
 					<template #singleLabel="{option}">
-						<Avatar
+						<NcAvatar
 							:size="34"
 							:url="getConversationIconUrl(option)"
 							display-name="#" />
@@ -90,7 +90,7 @@
 					<template #noOptions>
 						{{ t('integration_wire', 'Start typing to search') }}
 					</template>
-				</Multiselect>
+				</NcMultiselect>
 				<div class="advanced-options">
 					<span class="field-label">
 						<PackageUpIcon />
@@ -101,7 +101,7 @@
 						</span>
 					</span>
 					<div>
-						<CheckboxRadioSwitch
+						<NcCheckboxRadioSwitch
 							:checked.sync="sendType"
 							value="file"
 							name="send_type_radio"
@@ -110,8 +110,8 @@
 							<span class="option-title">
 								{{ t('integration_wire', 'Upload files') }}
 							</span>
-						</CheckboxRadioSwitch>
-						<CheckboxRadioSwitch
+						</NcCheckboxRadioSwitch>
+						<NcCheckboxRadioSwitch
 							:checked.sync="sendType"
 							value="link"
 							name="send_type_radio"
@@ -120,7 +120,7 @@
 							<span class="option-title">
 								{{ t('integration_wire', 'Public links') }}
 							</span>
-						</CheckboxRadioSwitch>
+						</NcCheckboxRadioSwitch>
 					</div>
 					<RadioElementSet v-if="sendType === 'link'"
 						name="perm_radio"
@@ -137,11 +137,11 @@
 					</RadioElementSet>
 					<div v-show="sendType === 'link'"
 						class="expiration-field">
-						<CheckboxRadioSwitch :checked.sync="expirationEnabled">
+						<NcCheckboxRadioSwitch :checked.sync="expirationEnabled">
 							{{ t('integration_wire', 'Set expiration date') }}
-						</CheckboxRadioSwitch>
+						</NcCheckboxRadioSwitch>
 						<div class="spacer" />
-						<DatetimePicker v-show="expirationEnabled"
+						<NcDatetimePicker v-show="expirationEnabled"
 							id="expiration-datepicker"
 							v-model="expirationDate"
 							:disabled-date="isDateDisabled"
@@ -150,9 +150,9 @@
 					</div>
 					<div v-show="sendType === 'link'"
 						class="password-field">
-						<CheckboxRadioSwitch :checked.sync="passwordEnabled">
+						<NcCheckboxRadioSwitch :checked.sync="passwordEnabled">
 							{{ t('integration_wire', 'Set link password') }}
-						</CheckboxRadioSwitch>
+						</NcCheckboxRadioSwitch>
 						<div class="spacer" />
 						<input v-show="passwordEnabled"
 							id="password-input"
@@ -201,19 +201,19 @@
 					</NcButton>
 				</div>
 			</div>
-		</Modal>
+		</NcModal>
 	</div>
 </template>
 
 <script>
-import Multiselect from '@nextcloud/vue/dist/Components/Multiselect.js'
-import Highlight from '@nextcloud/vue/dist/Components/Highlight.js'
-import CheckboxRadioSwitch from '@nextcloud/vue/dist/Components/CheckboxRadioSwitch.js'
-import DatetimePicker from '@nextcloud/vue/dist/Components/DatetimePicker.js'
-import Modal from '@nextcloud/vue/dist/Components/Modal.js'
+import NcMultiselect from '@nextcloud/vue/dist/Components/NcMultiselect.js'
+import NcHighlight from '@nextcloud/vue/dist/Components/NcHighlight.js'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/dist/Components/NcCheckboxRadioSwitch.js'
+import NcDatetimePicker from '@nextcloud/vue/dist/Components/NcDatetimePicker.js'
+import NcModal from '@nextcloud/vue/dist/Components/NcModal.js'
 // import LoadingIcon from '@nextcloud/vue/dist/Components/LoadingIcon.js'
-import NcButton from '@nextcloud/vue/dist/Components/Button.js'
-import Avatar from '@nextcloud/vue/dist/Components/Avatar.js'
+import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
+import NcAvatar from '@nextcloud/vue/dist/Components/NcAvatar.js'
 
 import SendIcon from 'vue-material-design-icons/Send.vue'
 import FileIcon from 'vue-material-design-icons/File.vue'
@@ -243,15 +243,15 @@ export default {
 
 	components: {
 		WireIcon,
-		Multiselect,
-		CheckboxRadioSwitch,
-		DatetimePicker,
-		Highlight,
-		Modal,
+		NcMultiselect,
+		NcCheckboxRadioSwitch,
+		NcDatetimePicker,
+		NcHighlight,
+		NcModal,
 		RadioElementSet,
 		// LoadingIcon,
 		NcButton,
-		Avatar,
+		NcAvatar,
 		SendIcon,
 		PoundBoxIcon,
 		FileIcon,
@@ -415,7 +415,7 @@ export default {
 
 <style scoped lang="scss">
 .wire-modal-content {
-	width: 100%;
+	//width: 100%;
 	padding: 16px;
 	display: flex;
 	flex-direction: column;

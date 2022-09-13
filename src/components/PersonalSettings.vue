@@ -67,12 +67,12 @@
 					</NcButton>
 				</div>
 				<br>
-				<CheckboxRadioSwitch
+				<NcCheckboxRadioSwitch
 					class="top-element"
 					:checked.sync="state.navigation_enabled"
 					@update:checked="onCheckboxChanged($event, 'navigation_enabled')">
 					{{ t('integration_wire', 'Enable navigation link') }}
-				</CheckboxRadioSwitch>
+				</NcCheckboxRadioSwitch>
 			</div>
 		</div>
 	</div>
@@ -89,20 +89,20 @@ import CheckIcon from 'vue-material-design-icons/Check.vue'
 
 import WireIcon from './icons/WireIcon.vue'
 
-import NcButton from '@nextcloud/vue/dist/Components/Button.js'
+import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
 import { loadState } from '@nextcloud/initial-state'
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
 import { delay } from '../utils.js'
 import { showSuccess, showError } from '@nextcloud/dialogs'
-import CheckboxRadioSwitch from '@nextcloud/vue/dist/Components/CheckboxRadioSwitch.js'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/dist/Components/NcCheckboxRadioSwitch.js'
 
 export default {
 	name: 'PersonalSettings',
 
 	components: {
 		WireIcon,
-		CheckboxRadioSwitch,
+		NcCheckboxRadioSwitch,
 		NcButton,
 		OpenInNewIcon,
 		CloseIcon,
@@ -210,7 +210,7 @@ export default {
 
 <style scoped lang="scss">
 #wire_prefs {
-	#wire-content{
+	#wire-content {
 		margin-left: 40px;
 	}
 
