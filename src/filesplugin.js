@@ -16,7 +16,7 @@ import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import { translate as t, translatePlural as n } from '@nextcloud/l10n'
 
-import { connectConfirmDialog, login } from './utils.js'
+import { connectConfirmDialog, doLogin } from './utils.js'
 
 import Vue from 'vue'
 import './bootstrap.js'
@@ -63,12 +63,8 @@ function openLoginModal(files) {
 
 			fileList.registerMultiSelectFileAction({
 				name: 'WireSendMulti',
-				displayName: (context) => {
-					return t('integration_wire', 'Send files to Wire')
-				},
-				iconClass: () => {
-					return 'icon-wire'
-				},
+				displayName: t('integration_wire', 'Send files to Wire'),
+				iconClass: 'icon-wire',
 				order: -2,
 				action: (selectedFiles) => {
 					const filesToSend = selectedFiles.map((f) => {
@@ -89,14 +85,10 @@ function openLoginModal(files) {
 
 			fileList.fileActions.registerAction({
 				name: 'wireSendSingle',
-				displayName: (context) => {
-					return t('integration_wire', 'Send to Wire')
-				},
+				displayName: t('integration_wire', 'Send to Wire'),
+				iconClass: 'icon-wire',
 				mime: 'all',
 				order: -139,
-				iconClass: (fileName, context) => {
-					return 'icon-wire'
-				},
 				permissions: OC.PERMISSION_READ,
 				actionHandler: (fileName, context) => {
 					const filesToSend = [
@@ -272,6 +264,33 @@ OCA.Wire.WireSendModalVue.$on('validate', ({ filesToSend, conversationId, conver
 	}
 })
 
+// LOGIN MODAL
+const loginModalId = 'wireLoginModal'
+const loginModalElement = document.createElement('div')
+loginModalElement.id = loginModalId
+document.body.append(loginModalElement)
+
+const LoginView = Vue.extend(LoginModal)
+OCA.Wire.WireLoginModalVue = new LoginView({
+	propsData: {
+		wireUrl: OCA.Wire.wireDisplayUrl,
+	},
+}).$mount(loginModalElement)
+
+OCA.Wire.WireLoginModalVue.$on('closed', () => {
+	if (DEBUG) console.debug('[Wire] login modal closed')
+})
+
+OCA.Wire.WireLoginModalVue.$on('validate', ({ login, password }) => {
+	doLogin(login, password).then(loginResponse => {
+		console.debug('login response', loginResponse)
+		if (loginResponse) {
+			OCA.Wire.wireConnected = true
+			openConversationSelector(OCA.Wire.filesBeforeLogin)
+		}
+	})
+})
+
 // get Wire state
 const urlCheckConnection = generateUrl('/apps/integration_wire/is-connected')
 axios.get(urlCheckConnection).then((response) => {
@@ -279,36 +298,11 @@ axios.get(urlCheckConnection).then((response) => {
 	OCA.Wire.wireUrl = response.data.url
 	OCA.Wire.wireDisplayUrl = response.data.display_url
 	if (DEBUG) console.debug('[Wire] OCA.Wire', OCA.Wire)
-
-	OC.Plugins.register('OCA.Files.FileList', OCA.Wire.FilesPlugin)
-
-	// login modal
-	const loginModalId = 'wireLoginModal'
-	const loginModalElement = document.createElement('div')
-	loginModalElement.id = loginModalId
-	document.body.append(loginModalElement)
-
-	const LoginView = Vue.extend(LoginModal)
-	OCA.Wire.WireLoginModalVue = new LoginView({
-		propsData: {
-			wireUrl: OCA.Wire.wireDisplayUrl,
-		},
-	}).$mount(loginModalElement)
-
-	OCA.Wire.WireLoginModalVue.$on('closed', () => {
-		if (DEBUG) console.debug('[Wire] login modal closed')
-	})
-
-	const mlogin = login
-	OCA.Wire.WireLoginModalVue.$on('validate', ({ login, password }) => {
-		mlogin(login, password).then(loginResponse => {
-			console.debug('login response', loginResponse)
-			if (loginResponse) {
-				OCA.Wire.wireConnected = true
-				openConversationSelector(OCA.Wire.filesBeforeLogin)
-			}
-		})
-	})
 }).catch((error) => {
 	console.error(error)
+})
+
+document.addEventListener('DOMContentLoaded', () => {
+	if (DEBUG) console.debug('[Wire] before register files plugin')
+	OC.Plugins.register('OCA.Files.FileList', OCA.Wire.FilesPlugin)
 })

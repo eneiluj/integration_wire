@@ -14,7 +14,7 @@ export function delay(callback, ms) {
 	}
 }
 
-export function login(login, password) {
+export function doLogin(login, password) {
 	return new Promise((resolve, reject) => {
 		const req = {
 			values: {
