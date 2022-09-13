@@ -42,8 +42,10 @@ class Personal implements ISettings {
 	 * @return TemplateResponse
 	 */
 	public function getForm(): TemplateResponse {
+		$navigationEnabled = $this->config->getUserValue($this->userId, Application::APP_ID, 'navigation_enabled', '0') === '1';
+		$fileActionEnabled = $this->config->getUserValue($this->userId, Application::APP_ID, 'file_action_enabled', '1') === '1';
+
 		$token = $this->config->getUserValue($this->userId, Application::APP_ID, 'token');
-		$navigationEnabled = $this->config->getUserValue($this->userId, Application::APP_ID, 'navigation_enabled', '0');
 		$wireUserId = $this->config->getUserValue($this->userId, Application::APP_ID, 'user_id');
 		$wireUserName = $this->config->getUserValue($this->userId, Application::APP_ID, 'user_name');
 		$wireUserDisplayName = $this->config->getUserValue($this->userId, Application::APP_ID, 'user_displayname');
@@ -56,7 +58,8 @@ class Personal implements ISettings {
 			'user_id' => $wireUserId,
 			'user_name' => $wireUserName,
 			'user_displayname' => $wireUserDisplayName,
-			'navigation_enabled' => ($navigationEnabled === '1'),
+			'navigation_enabled' => $navigationEnabled,
+			'file_action_enabled' => $fileActionEnabled,
 		];
 		$this->initialStateService->provideInitialState('user-config', $userConfig);
 		return new TemplateResponse(Application::APP_ID, 'personalSettings');

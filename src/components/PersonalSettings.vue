@@ -68,6 +68,11 @@
 				</div>
 				<br>
 				<NcCheckboxRadioSwitch
+					:checked.sync="state.file_action_enabled"
+					@update:checked="onCheckboxChanged($event, 'file_action_enabled')">
+					{{ t('integration_mattermost', 'Add file action to send files to Wire') }}
+				</NcCheckboxRadioSwitch>
+				<NcCheckboxRadioSwitch
 					class="top-element"
 					:checked.sync="state.navigation_enabled"
 					@update:checked="onCheckboxChanged($event, 'navigation_enabled')">
