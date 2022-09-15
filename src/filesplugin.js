@@ -123,11 +123,13 @@ function openLoginModal(files) {
 
 })()
 
-function sendLinks(conversationId, conversationName, comment, permission, expirationDate, password) {
+function sendLinks(conversationId, conversationDomain, conversationName, conversationMembers, comment, permission, expirationDate, password) {
 	const req = {
 		fileIds: OCA.Wire.filesToSend.map((f) => f.id),
 		conversationId,
+		conversationDomain,
 		conversationName,
+		conversationMembers,
 		comment,
 		permission,
 		expirationDate: expirationDate ? moment(expirationDate).format('YYYY-MM-DD') : undefined,
@@ -245,10 +247,10 @@ OCA.Wire.WireSendModalVue = new View().$mount(modalElement)
 OCA.Wire.WireSendModalVue.$on('closed', () => {
 	if (DEBUG) console.debug('[Wire] modal closed')
 })
-OCA.Wire.WireSendModalVue.$on('validate', ({ filesToSend, conversationId, conversationName, type, comment, permission, expirationDate, password }) => {
+OCA.Wire.WireSendModalVue.$on('validate', ({ filesToSend, conversationId, conversationDomain, conversationName, conversationMembers, type, comment, permission, expirationDate, password }) => {
 	OCA.Wire.filesToSend = filesToSend
 	if (type === 'link') {
-		sendLinks(conversationId, conversationName, comment, permission, expirationDate, password)
+		sendLinks(conversationId, conversationDomain, conversationName, conversationMembers, comment, permission, expirationDate, password)
 	} else {
 		sendMessage(conversationId, comment).then((response) => {
 			sendFileLoop(conversationId, conversationName)

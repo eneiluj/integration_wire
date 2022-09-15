@@ -172,10 +172,11 @@ class WireAPIController extends Controller {
 	 * @return DataResponse
 	 * @throws \Exception
 	 */
-	public function sendLinks(array  $fileIds, string $conversationId, string $conversationName, string $comment,
-							  string $permission, ?string $expirationDate = null, ?string $password = null): DataResponse {
+	public function sendLinks(array  $fileIds,
+							  string $conversationId, string $conversationDomain, string $conversationName, array $conversationMembers,
+							  string $comment, string $permission, ?string $expirationDate = null, ?string $password = null): DataResponse {
 		$result = $this->wireAPIService->sendLinks(
-			$this->userId, $fileIds, $conversationId, $conversationName,
+			$this->userId, $fileIds, $conversationDomain, $conversationId, $conversationName, $conversationMembers,
 			$comment, $permission, $expirationDate, $password
 		);
 		if (isset($result['error'])) {

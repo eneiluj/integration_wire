@@ -154,6 +154,7 @@ class ConfigController extends Controller {
 
 		$result = $this->wireAPIService->login($this->userId, $login, $password);
 		if (isset($result['access_token'], $result['expires_in'], $result['user'])) {
+			file_put_contents('/tmp/awire', json_encode($result));
 			$this->config->setUserValue($this->userId, Application::APP_ID, 'token', $result['access_token']);
 			$nowTs = (new Datetime())->getTimestamp();
 			$expiresAt = $nowTs + (int) $result['expires_in'];

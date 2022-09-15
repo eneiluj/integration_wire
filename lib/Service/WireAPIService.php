@@ -133,85 +133,6 @@ class WireAPIService {
 
 	/**
 	 * @param string $userId
-	 * @param string $wireUserName
-	 * @param int|null $since
-	 * @return array|string[]
-	 * @throws Exception
-	 */
-	public function getMentionsMe(string $userId, string $wireUserName, ?int $since = null): array {
-		$params = [
-			'include_deleted_channels' => true,
-			'is_or_search' => true,
-			'page' => 0,
-			'per_page' => 20,
-			'terms' => '@' . $wireUserName . ' ',
-			'time_zone_offset' => 7200,
-		];
-		$result = $this->request($userId, 'posts/search', $params, 'POST');
-		if (isset($result['error'])) {
-			return $result;
-		}
-		$posts = $result['posts'] ?? [];
-
-		// since filter
-		$posts = array_filter($posts, function(array $post) use ($since) {
-			$postTs = (int) $post['create_at'];
-			return $postTs > $since;
-		});
-
-		$posts = $this->addPostInfos($posts, $userId);
-
-		// sort post by creation date, DESC
-		usort($posts, function($a, $b) {
-			$ta = (int) $a['create_at'];
-			$tb = (int) $b['create_at'];
-			return ($ta > $tb) ? -1 : 1;
-		});
-		return $posts;
-	}
-
-	/**
-	 * @param array $posts
-	 * @param string $userId
-	 * @return array
-	 * @throws Exception
-	 */
-	public function addPostInfos(array $posts, string $userId): array {
-		if (count($posts) > 0) {
-			$channelsPerId = $this->getMyConversationsPerId($userId);
-			// get channel and team information for each post
-			foreach ($posts as $postId => $post) {
-				$channelId = $post['channel_id'];
-				$posts[$postId]['channel_name'] = $channelsPerId[$channelId]['name'] ?? '';
-				$posts[$postId]['channel_display_name'] = $channelsPerId[$channelId]['display_name'] ?? '';
-				$posts[$postId]['team_id'] = $channelsPerId[$channelId]['team_id'] ?? '';
-				$posts[$postId]['team_name'] = $channelsPerId[$channelId]['team_name'] ?? '';
-				$posts[$postId]['team_display_name'] = $channelsPerId[$channelId]['team_display_name'] ?? '';
-			}
-
-			// get user/author info
-			$usersById = [];
-			foreach ($posts as $postId => $post) {
-				$usersById[$post['user_id']] = [];
-			}
-			foreach ($usersById as $mmUserId => $user) {
-				$userInfo = $this->request($userId, 'users/' . $mmUserId);
-				if (isset($userInfo['username'], $userInfo['first_name'], $userInfo['last_name'])) {
-					$usersById[$mmUserId]['user_name'] = $userInfo['username'];
-					$usersById[$mmUserId]['user_display_name'] = $userInfo['first_name'] . ' ' . $userInfo['last_name'];
-				}
-			}
-			foreach ($posts as $postId => $post) {
-				$mmUserId = $post['user_id'];
-				$posts[$postId]['user_name'] = $usersById[$mmUserId]['user_name'] ?? '';
-				$posts[$postId]['user_display_name'] = $usersById[$mmUserId]['user_display_name'] ?? '';
-			}
-		}
-		return $posts;
-	}
-
-	/**
-	 * @param string $userId
 	 * @return array|string[]
 	 * @throws Exception
 	 */
@@ -297,7 +218,8 @@ class WireAPIService {
 	 * @throws PreConditionNotMetException
 	 */
 	public function sendLinks(string $userId, array $fileIds,
-							  string $conversationDomain, string $conversationId, string $conversationName,
+							  string $conversationDomain, string $conversationId,
+							  string $conversationName, array $conversationMembers,
 							  string $comment, string $permission, ?string $expirationDate = null, ?string $password = null): array {
 		$links = [];
 		$userFolder = $this->root->getUserFolder($userId);
@@ -348,7 +270,7 @@ class WireAPIService {
 			foreach ($links as $link) {
 				$message .= '```' . $link['name'] . '```: ' . $link['url'] . "\n";
 			}
-			return $this->sendMessage($userId, $message, $conversationDomain, $conversationId);
+			return $this->sendMessage($userId, $message, $conversationDomain, $conversationId, $conversationMembers);
 		} else {
 			return ['error' => 'Files not found'];
 		}
@@ -362,14 +284,59 @@ class WireAPIService {
 	 * @return array|string[]
 	 * @throws PreConditionNotMetException
 	 */
-	public function sendMessage(string $userId, string $message, string $conversationDomain, string $conversationId): array {
+	public function sendMessage(string $userId, string $message,
+								string $conversationDomain, string $conversationId, array $conversationMembers): array {
+		error_log('MEMEMEMEMEMEMEMEME '.json_encode($conversationMembers));
+		$myUserId = $this->config->getUserValue($userId, Application::APP_ID, 'user_id');
 		// TODO generate an encrypted message for all target user's devices
 		// concept briefly explained there: https://docs.wire.com/understand/federation/api.html?highlight=send#message-sending-a
 		// not enough information in https://staging-nginz-https.zinfra.io/api/swagger-ui/#/default/post_conversations__cnv_domain___cnv__proteus_messages
-		$body = $message;
+		$body = [
+			'data' => $message,
+    		'blob' => $message,
+			'sender' => $myUserId, // sender client ID
+			// otr style
+			'recipients' => [
+				'additionalProp1' => [
+				  'additionalProp1' => 'string',
+				  'additionalProp2' => 'string',
+				  'additionalProp3' => 'string',
+				],
+			],
+			'report_missing' => [
+				'99db9768-04e3-4b5d-9268-831b6a25c4ab',
+			],
+    		'native_push' => true, // optional type bool
+    		'native_priority' => 'low', // optional type Priority
+    		'transient' => true, // optional type bool
+
+			//// protobuf style
+    		//'recipients' => [
+			//	[
+			//		'domain' => , // target domain
+			//		'entries' => [
+			//			[ // UserEntry
+			//				'user' => , // UserId
+			//				'clients' => [
+			//					[ // ClientEntry
+			//						'client' => , // ClientId
+			//						'text' => , // bytes
+			//					],
+			//				],
+			//			],
+			//		],
+			//	],
+			//],
+//			'client_mismatch_strategy' => 'report_all', // report_all || ignore_all || report_only || ignore_only
+		];
+//		$endpoint = 'conversations/' . $conversationDomain . '/' . $conversationId . '/proteus/messages';
+//		$contentType = 'application/x-protobuf';
+		$endpoint = 'conversations/' . $conversationId . '/otr/messages';
+		$contentType = 'application/json;charset=utf-8';
+		error_log('I SEND '.json_encode($body). ' TO '.$endpoint);
 		return $this->request(
-			$userId, 'conversations/' . $conversationDomain . '/' . $conversationId . '/proteus/messages',
-			[], 'POST', true, false, 'application/x-protobuf', $body
+			$userId, $endpoint, [], 'POST',
+			true, false, $contentType, json_encode($body)
 		);
 	}
 
@@ -458,7 +425,7 @@ class WireAPIService {
 				}
 			}
 		} catch (ServerException | ClientException $e) {
-			$this->logger->debug('Wire API error : '.$e->getMessage(), ['app' => Application::APP_ID]);
+			$this->logger->warning('Wire API error : ' . $e->getMessage());
 			return ['error' => $e->getMessage()];
 		}
 	}

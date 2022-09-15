@@ -341,8 +341,11 @@ export default {
 			this.loading = true
 			this.$emit('validate', {
 				filesToSend: [...this.files],
-				conversationId: this.selectedConversation.id,
-				conversatonName: this.selectedConversation.name,
+				// conversationId: this.selectedConversation.id,
+				conversationId: this.selectedConversation.qualified_id?.id,
+				conversationDomain: this.selectedConversation.qualified_id?.domain,
+				conversationName: this.selectedConversation.name,
+				conversationMembers: this.selectedConversation.members?.others,
 				type: this.sendType,
 				comment: this.comment,
 				permission: this.selectedPermission,
