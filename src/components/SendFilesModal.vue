@@ -423,7 +423,7 @@ export default {
 	display: flex;
 	flex-direction: column;
 
-	> * {
+	> *:not(.wire-footer) {
 		margin-bottom: 16px;
 	}
 
@@ -547,7 +547,6 @@ export default {
 
 .wire-footer {
 	display: flex;
-	padding-bottom: 16px;
 	> * {
 		margin-left: 8px;
 	}
