@@ -274,9 +274,7 @@ document.body.append(loginModalElement)
 
 const LoginView = Vue.extend(LoginModal)
 OCA.Wire.WireLoginModalVue = new LoginView({
-	propsData: {
-		wireUrl: OCA.Wire.wireDisplayUrl,
-	},
+	propsData: {},
 }).$mount(loginModalElement)
 
 OCA.Wire.WireLoginModalVue.$on('closed', () => {
@@ -299,6 +297,7 @@ axios.get(urlCheckConnection).then((response) => {
 	OCA.Wire.wireConnected = response.data.connected
 	OCA.Wire.wireUrl = response.data.url
 	OCA.Wire.wireDisplayUrl = response.data.display_url
+	OCA.Wire.WireLoginModalVue.$props.wireUrl = OCA.Wire.wireDisplayUrl
 	if (DEBUG) console.debug('[Wire] OCA.Wire', OCA.Wire)
 }).catch((error) => {
 	console.error(error)
